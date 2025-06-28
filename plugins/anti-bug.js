@@ -13,7 +13,7 @@ const saveBanlist = () => {
 
 module.exports = {
   name: "anti-bug",
-  description: "Detekte ak bloke bug/crash messages",
+  description: "Detekte, efase ak bloke mesaj bug/crash",
   type: "spam", // Pou tout mesaj
   async execute(conn, mek, m) {
     try {
@@ -24,24 +24,36 @@ module.exports = {
       // Deteksyon mesaj potansyèlman danjere
       const isBug =
         msg.length > 2000 || // twò long
-        /[\u200E\u200F\u202E\u202D\u2060\u2061\u2062\u2063\u2064]/.test(msg); // karaktè crash
+        /[\u200E\u200F\u202E\u202D\u2060\u2061\u2062\u2063\u2064]/.test(msg); // karaktè Unicode bug
 
       if (isBug && !bannedUsers.includes(sender)) {
+
+        // 🧹 Efase mesaj lan anvan tout lòt aksyon
+        await conn.sendMessage(chat, {
+          delete: {
+            remoteJid: chat,
+            fromMe: false,
+            id: m.key.id,
+            participant: m.key.participant || sender
+          }
+        });
+
+        // ➕ Mete sender lan nan banlist
         bannedUsers.push(sender);
         saveBanlist();
 
-        // Bloke user
+        // 🚫 Bloke moun lan
         await conn.updateBlockStatus(sender, "block");
 
-        // Notify sender
+        // ⚠️ Notify group oswa chat
         await conn.sendMessage(chat, {
-          text: `🚫 *@${sender.split("@")[0]}*, ou bloke otomatikman paske ou voye yon mesaj danjere.`,
+          text: `🚫 *@${sender.split("@")[0]}*, ou te voye yon mesaj danjere e ou bloke otomatikman.`,
           mentions: [sender],
         });
 
-        // Notify owner
+        // 🔔 Notify OWNER
         await conn.sendMessage(config.OWNER_NUMBER + "@s.whatsapp.net", {
-          text: `🛡️ *ANTI-BUG ALERT*\n\n👤 *User:* @${sender.split("@")[0]}\n📩 *Reason:* Suspected bug/crash message.\n\n✅ Bloke & sove nan banlist.`,
+          text: `🛡️ *ANTI-BUG ALERT*\n\n👤 *User:* @${sender.split("@")[0]}\n📩 *Reason:* Bug/crash message detected and deleted.\n\n✅ Bloke & sove nan banlist.`,
           mentions: [sender],
         });
       }
