@@ -1,56 +1,60 @@
 const { cmd } = require('../command');
 const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
 
-cmd({
-  pattern: 'wasted',
-  alias: ['wastedgta'],
-  desc: "Add GTA Wasted effect to user's profile picture or replied image",
-  category: 'fun',
-  filename: __filename,
-}, async (conn, mek, m, { from, reply }) => {
-  try {
-    let imageBuffer;
+const effects = {
+  wasted: 'wasted',
+  triggered: 'triggered',
+  rip: 'rip',
+  jail: 'jail',
+  blur: 'blur'
+};
 
-    if (m.quoted && m.quoted.message.imageMessage) {
-      imageBuffer = await conn.downloadMediaMessage(m.quoted);
-    } else {
-      try {
-        const pfpUrl = await conn.profilePictureUrl(m.sender, 'image');
-        const response = await axios.get(pfpUrl, { responseType: 'arraybuffer' });
-        imageBuffer = Buffer.from(response.data, 'binary');
-      } catch {
-        return reply('Could not get profile picture and no image replied.');
+for (const [cmdName, effectType] of Object.entries(effects)) {
+  cmd({
+    pattern: cmdName,
+    desc: `Generate ${cmdName.toUpperCase()} effect from replied photo or profile picture`,
+    category: 'fun',
+    filename: __filename,
+  }, async (conn, mek, m, { from, reply }) => {
+    try {
+      let imageBuffer;
+
+      // 1. Get replied image or profile pic
+      if (m.quoted && m.quoted.message?.imageMessage) {
+        imageBuffer = await conn.downloadMediaMessage(m.quoted);
+      } else {
+        try {
+          const imageUrl = await conn.profilePictureUrl(m.sender, 'image');
+          const res = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+          imageBuffer = Buffer.from(res.data, 'binary');
+        } catch {
+          return reply('❌ Pa jwenn foto reponn ni profil ou.');
+        }
       }
+
+      // 2. Convert to base64
+      const base64Image = imageBuffer.toString('base64');
+
+      // 3. Call nekobot API
+      const { data } = await axios.get('https://nekobot.xyz/api/imagegen', {
+        params: {
+          type: effectType,
+          image: `data:image/jpeg;base64,${base64Image}`
+        }
+      });
+
+      if (!data.success) return reply(`❌ Pa ka kreye imaj ${cmdName.toUpperCase()}.`);
+
+      // 4. Download effect image
+      const effectImage = await axios.get(data.message, { responseType: 'arraybuffer' });
+      const effectBuffer = Buffer.from(effectImage.data, 'binary');
+
+      // 5. Send result
+      await conn.sendMessage(from, { image: effectBuffer, caption: `*${cmdName.toUpperCase()} Effect!*` }, { quoted: mek });
+
+    } catch (e) {
+      console.error(`${cmdName} Error:`, e);
+      reply(`❌ Erè pandan ap kreye imaj ${cmdName.toUpperCase()}.`);
     }
-
-    const tempPath = path.join(__dirname, 'tempwasted.jpg');
-    fs.writeFileSync(tempPath, imageBuffer);
-
-    // Upload to ImgBB (need API key)
-    const imgbbApiKey = 'YOUR_IMGBB_API_KEY';
-
-    const imgbbResponse = await axios.post('https://api.imgbb.com/1/upload', null, {
-      params: {
-        key: imgbbApiKey,
-        image: imageBuffer.toString('base64')
-      }
-    });
-
-    const imgUrl = imgbbResponse.data.data.url;
-
-    // Call wasted API
-    const wastedUrl = `https://some-random-api.ml/canvas/wasted?avatar=${encodeURIComponent(imgUrl)}`;
-
-    const wastedImageResponse = await axios.get(wastedUrl, { responseType: 'arraybuffer' });
-    const wastedImageBuffer = Buffer.from(wastedImageResponse.data, 'binary');
-
-    await conn.sendMessage(from, { image: wastedImageBuffer, caption: '*WASTED!*' }, { quoted: mek });
-
-    fs.unlinkSync(tempPath);
-  } catch (e) {
-    console.error('Wasted Command Error:', e);
-    reply('Failed to create Wasted effect. Please try again.');
-  }
-});
+  });
+}
