@@ -17,7 +17,7 @@ module.exports = {
       if (!response) return;
 
       await conn.sendMessage(m.chat, {
-        text: `🤖 *ChatBot*\n\n${response}\n\n_Powered by Black-Tappy_`
+        text: `🤖 *ChatBot*\n\n${response}\n\n_Powered by dawens-boy_`
       }, { quoted: m });
 
     } catch (err) {
