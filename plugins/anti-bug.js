@@ -22,7 +22,7 @@ const TIME_WINDOW = 5000; // 5 seconds
 module.exports = {
   name: "anti-bug",
   description: "Detekte, efase, epi bloke mesaj ki ka fè bot la fè erè oswa spam.",
-  type: "spam",
+  type: "all",
 
   async execute(conn, mek, m) {
     try {
