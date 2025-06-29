@@ -2,7 +2,6 @@ const { cmd } = require('../command');
 const config = require('../config');
 const fs = require('fs');
 const path = require('path');
-const { isPremium } = require('../lib/premium');
 
 cmd({
   pattern: 'x-force',
