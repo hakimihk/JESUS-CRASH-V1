@@ -1,6 +1,5 @@
 // commands/chatbot.js
 const { getGptReply } = require('../data/ai');
-const { isPublic } = require('../handler/settings.json'); // example check
 
 module.exports = {
   name: 'chatbot',
