@@ -1,64 +1,102 @@
 const fs = require('fs');
 const path = require('path');
-const banPath = path.join(__dirname, '../lib/banlist.json');
 const config = require('../config');
 
-// Kreye banlist si pa egziste
-if (!fs.existsSync(banPath)) fs.writeFileSync(banPath, JSON.stringify([]));
+const banPath = path.join(__dirname, '../lib/banlist.json');
+
+if (!fs.existsSync(banPath)) {
+  fs.writeFileSync(banPath, JSON.stringify([]));
+}
+
 let bannedUsers = JSON.parse(fs.readFileSync(banPath));
 
 const saveBanlist = () => {
   fs.writeFileSync(banPath, JSON.stringify(bannedUsers, null, 2));
 };
 
+// 🧠 Tracking rapid message sending
+const messageCounts = {}; // { sender: { count, lastTime } }
+const SPAM_THRESHOLD = 3;
+const TIME_WINDOW = 5000; // 5 seconds
+
 module.exports = {
   name: "anti-bug",
-  description: "Detekte, efase ak bloke mesaj bug/crash",
-  type: "spam", // Pou tout mesaj
+  description: "Detekte, efase, epi bloke mesaj ki ka fè bot la fè erè oswa spam.",
+  type: "spam",
+
   async execute(conn, mek, m) {
     try {
       const sender = m.sender;
-      const msg = m?.text || '';
       const chat = m.chat;
+      const msg = m?.text || "";
 
-      // Deteksyon mesaj potansyèlman danjere
+      // ⏱️ Mesaj rapid deteksyon
+      const now = Date.now();
+      if (!messageCounts[sender]) {
+        messageCounts[sender] = { count: 1, lastTime: now };
+      } else {
+        const elapsed = now - messageCounts[sender].lastTime;
+        if (elapsed <= TIME_WINDOW) {
+          messageCounts[sender].count += 1;
+        } else {
+          messageCounts[sender].count = 1; // reset si twò lontan
+        }
+        messageCounts[sender].lastTime = now;
+      }
+
+      // Si yo voye 3 mesaj rapid → konsidere kòm spam
+      if (messageCounts[sender].count >= SPAM_THRESHOLD && !bannedUsers.includes(sender)) {
+        bannedUsers.push(sender);
+        saveBanlist();
+
+        await conn.updateBlockStatus(sender, "block");
+
+        await conn.sendMessage(chat, {
+          text: `🚫 *@${sender.split("@")[0]}*, ou te voye mesaj twò rapid. Ou bloke otomatikman kòm spam.`,
+          mentions: [sender],
+        });
+
+        await conn.sendMessage(`${config.OWNER_NUMBER}@s.whatsapp.net`, {
+          text: `⚠️ *ANTI-SPAM ALERT*\n\n👤 *User:* @${sender.split("@")[0]}\n📩 *Reason:* 3 mesaj rapid.\n\n✅ Bloke & ajoute nan banlist.`,
+          mentions: [sender],
+        });
+
+        return; // Sispann nenpòt lòt aksyon
+      }
+
+      // 🧪 Deteksyon mesaj danjere (bug/crash)
       const isBug =
-        msg.length > 2000 || // twò long
-        /[\u200E\u200F\u202E\u202D\u2060\u2061\u2062\u2063\u2064]/.test(msg); // karaktè Unicode bug
+        msg.length > 2000 || 
+        /[\u200E\u200F\u202E\u202D\u2060-\u2064]/.test(msg);
 
       if (isBug && !bannedUsers.includes(sender)) {
-
-        // 🧹 Efase mesaj lan anvan tout lòt aksyon
+        // 🧹 Efase mesaj lan
         await conn.sendMessage(chat, {
           delete: {
             remoteJid: chat,
             fromMe: false,
             id: m.key.id,
-            participant: m.key.participant || sender
-          }
+            participant: m.key.participant || sender,
+          },
         });
 
-        // ➕ Mete sender lan nan banlist
         bannedUsers.push(sender);
         saveBanlist();
 
-        // 🚫 Bloke moun lan
         await conn.updateBlockStatus(sender, "block");
 
-        // ⚠️ Notify group oswa chat
         await conn.sendMessage(chat, {
           text: `🚫 *@${sender.split("@")[0]}*, ou te voye yon mesaj danjere e ou bloke otomatikman.`,
           mentions: [sender],
         });
 
-        // 🔔 Notify OWNER
-        await conn.sendMessage(config.OWNER_NUMBER + "@s.whatsapp.net", {
-          text: `🛡️ *ANTI-BUG ALERT*\n\n👤 *User:* @${sender.split("@")[0]}\n📩 *Reason:* Bug/crash message detected and deleted.\n\n✅ Bloke & sove nan banlist.`,
+        await conn.sendMessage(`${config.OWNER_NUMBER}@s.whatsapp.net`, {
+          text: `🛡️ *ANTI-BUG ALERT*\n\n👤 *User:* @${sender.split("@")[0]}\n📩 *Reason:* Mesaj danjere detekte.\n\n✅ Bloke & ajoute nan banlist.`,
           mentions: [sender],
         });
       }
     } catch (err) {
-      console.error("Erreur nan anti-bug:", err);
+      console.error("🛑 Erè nan anti-bug:", err);
     }
-  }
+  },
 };
