@@ -1,55 +1,45 @@
-const axios = require("axios");
-const config = require('../config');
-const { cmd } = require('../command');
+const { cmd, commands } = require('../command');
+const axios = require('axios');
 
 cmd({
-  pattern: "pair",
-  alias: ['paircode', 'code'],
-  desc: "Get a WhatsApp pairing code for a phone number",
-  category: "menu",
-  use: "pair <number>",
-  filename: __filename,
-  execute: async (m, gss) => {
-    const prefix = config.PREFIX;
-    const args = m.body.trim().split(/\s+/).slice(1);
-    const textnumber = args[0];
-
-    if (!textnumber) {
-      return m.reply("❗ Please provide a phone number.\nExample: *.pair 50942241547*");
-    }
-
+    pattern: "pair",
+    alias: ["getpair", "clonebot"],
+    react: "✅",
+    desc: "Get pairing code for 𝐉𝐄𝐒𝐔𝐒-𝐂𝐑𝐀𝐒𝐇-𝐕𝟏 bot",
+    category: "download",
+    use: ".pair 226XXXXX",
+    filename: __filename
+}, async (conn, mek, m, { from, quoted, body, isCmd, command, args, q, isGroup, senderNumber, reply }) => {
     try {
-      await m.reply("⏳ Fetching pair code...");
+        // Extract phone number from command
+        const phoneNumber = q ? q.trim().replace(/[^0-9]/g, '') : senderNumber.replace(/[^0-9]/g, '');
 
-      const api = `https://zarya-session-by-dawens-boy-tech.onrender.com/pair?phone=${encodeURIComponent(textnumber)}`;
-      const response = await axios.get(api);
-      const data = response.data;
-
-      if (!data?.pair_code) {
-        return m.reply("❌ Failed to retrieve pair code. Check the phone number and try again.");
-      }
-
-      const messagePayload = {
-        text: `${data.pair_code}`,
-        contextInfo: {
-          isForwarded: true,
-          forwardingScore: 777,
-          externalAdReply: {
-            title: data.title || "Pair Device",
-            body: data.creator || "Unknown",
-            thumbnailUrl: data.thumbnail || "",
-            sourceUrl: data.channel_link,
-            mediaType: 1,
-            renderLargerThumbnail: false 
-          }
+        // Validate phone number format
+        if (!phoneNumber || phoneNumber.length < 10 || phoneNumber.length > 15) {
+            return await reply("❌ Please provide a valid phone number without `+`\nExample: `.pair 1305896XXXXX`");
         }
-      };
 
-      await gss.sendMessage(m.from, messagePayload, { quoted: m });
+        // Make API request to get pairing code
+        const response = await axios.get(`https://sessions-jesus-crash.onrender.com/pair/code?number=${encodeURIComponent(phoneNumber)}`);
 
-    } catch (err) {
-      console.error("Pair Cmd Error:", err.message);
-      m.reply("❌ An error occurred:\n" + err.message);
+        if (!response.data || !response.data.code) {
+            return await reply("❌ Failed to retrieve pairing code. Please try again later.");
+        }
+
+        const pairingCode = response.data.code;
+        const doneMessage = "> *𝐉𝐄𝐒𝐔𝐒-𝐂𝐑𝐀𝐒𝐇-𝐕𝟏 PAIRING COMPLETED*";
+
+        // Send initial message with formatting
+        await reply(`${doneMessage}\n\n*Your pairing code is:* ${pairingCode}`);
+
+        // Optional 2-second delay
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Send clean code again
+        await reply(`${pairingCode}`);
+
+    } catch (error) {
+        console.error("Pair command error:", error);
+        await reply("❌ An error occurred while getting pairing code. Please try again later.");
     }
-  }
 });
