@@ -77,7 +77,7 @@ antispam.ResetSpam(global.db.data.antispam)
   //===================SESSION-AUTH============================
 if (!fs.existsSync(__dirname + '/sessions/creds.json')) {
 if(!config.SESSION_ID) return console.log('Please add your session to SESSION_ID env !!')
-const sessdata = config.SESSION_ID.replace("JESUS~CRASH~V1~", '');
+const sessdata = config.SESSION_ID.replace("JESUS~CRASH~V1~KtxnzArK#YXG05gLqwHjAHjwT4zYSMTdUXgeWr1p2OAkBSUQbGgU", '');
 const filer = File.fromURL(`https://mega.nz/file/${sessdata}`)
 filer.download((err, data) => {
 if(err) throw err
